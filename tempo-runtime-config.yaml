@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-runtime-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: tempo-stack
+data:
+  runtime-config.yaml: |
+    overrides: {}
+    # 按租户覆盖配置示例:
+    #   tenant-xxx:
+    #     ingestion_rate_limit_bytes: 200000000
+    #     max_traces_per_user: 100000

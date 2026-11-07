@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-tempo
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+    app.kubernetes.io/part-of: tempo-stack
+data:
+  tempo.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Tempo
+        type: tempo
+        access: proxy
+        uid: tempo
+        url: http://tempo-query-frontend.monitoring.svc.cluster.local:3200
+        isDefault: false
+        editable: true
+        jsonData:
+          httpMethod: GET
+          tracesToLogsV2:
+            # ─── Trace → Log 联动 (对接 k8s-loki-stack) ───
+            # 从 Tempo trace 中跳转到 Loki 查看关联日志
+            datasourceUid: loki
+            spanStartTimeShift: '-5m'
+            spanEndTimeShift: '5m'
+            filterByTraceID: true
+            filterBySpanID: false
+            tags:
+              - key: service.name
+                value: app
+            customQuery: false
+            query: '{app="${__span.tags.app}"}'
+          tracesToMetrics:
+            # ─── Trace → Metrics 联动 (对接 k8s-alerting-stack) ───
+            # 从 Tempo Span 跳转到 Prometheus 查看 RED 指标
+            datasourceUid: prometheus
+            spanStartTimeShift: '-5m'
+            spanEndTimeShift: '5m'
+            tags:
+              - key: service.name
+                value: service
+            queries:
+              - name: calls
+                query: 'sum(rate(traces_spanmetrics_calls_total{service="${__span.tags.service}"}[5m]))'
+              - name: latency (P99)
+                query: 'histogram_quantile(0.99, sum(rate(traces_spanmetrics_latency_bucket{service="${__span.tags.service}"}[5m])) by (le))'
+          serviceMap:
+            datasourceUid: prometheus
+          nodeGraph:
+            enabled: true
+          search:
+            hide: false
+          lokiSearch:
+            datasourceUid: loki
+
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        uid: prometheus
+        url: http://kps-kube-prometheus-stack-prometheus.monitoring:9090
+        isDefault: true
+        editable: true
+        jsonData:
+          # ─── Metrics → Trace 联动 (Exemplar 跳转 Tempo) ───
+          # Prometheus 指标图中的 ⭐ Exemplar 点可一键跳转到 Tempo Trace
+          exemplarTraceIdDestinations:
+            - name: traceID
+              datasourceUid: tempo
+          # ─── Prometheus 类型配置 ───
+          prometheusType: Prometheus
+          prometheusVersion: 3.0.0
+          timeInterval: 30s
+          httpMethod: POST
+          # ─── 内部链接 (Trace/Log 数据源联动) ───
+          tracesToMetrics:
+            datasourceUid: tempo

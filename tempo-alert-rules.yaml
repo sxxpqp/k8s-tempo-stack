@@ -1,0 +1,141 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tempo-self-monitoring
+  namespace: monitoring
+  labels:
+    release: kps
+    team: platform
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  groups:
+  - name: tempo-distributor
+    interval: 30s
+    rules:
+    - alert: TempoDistributorUnhealthy
+      expr: |
+        up{job="tempo-distributor"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo Distributor 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+
+  - name: tempo-ingester
+    interval: 30s
+    rules:
+    - alert: TempoIngesterUnhealthy
+      expr: |
+        up{job="tempo-ingester"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo Ingester 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+    - alert: TempoIngesterFlushFailures
+      expr: |
+        rate(tempo_ingester_failed_flushes_total[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Tempo Ingester flush 到存储失败"
+        description: "实例 {{ $labels.instance }} flush 失败率 {{ $value }}"
+    - alert: TempoReplayErrors
+      expr: |
+        rate(tempo_ingester_replay_errors_total[5m]) > 0
+      for: 10m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Tempo Ingester WAL 回放失败"
+        description: "实例 {{ $labels.instance }} 回放错误率 {{ $value }}"
+
+  - name: tempo-querier
+    interval: 30s
+    rules:
+    - alert: TempoQuerierUnhealthy
+      expr: |
+        up{job="tempo-querier"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo Querier 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+
+  - name: tempo-query-frontend
+    interval: 30s
+    rules:
+    - alert: TempoQueryFrontendUnhealthy
+      expr: |
+        up{job="tempo-query-frontend"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo Query Frontend 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+    - alert: TempoQueryErrors
+      expr: |
+        100 * sum(rate(tempo_query_frontend_queries_total{status_code=~"5.."}[5m])) by (op)
+        / sum(rate(tempo_query_frontend_queries_total[5m])) by (op) > 10
+      for: 15m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo {{ $labels.op }} 查询 5xx 错误率 > 10%"
+        description: "错误率 {{ $value | humanize }}%"
+
+  - name: tempo-compactor
+    interval: 30s
+    rules:
+    - alert: TempoCompactorUnhealthy
+      expr: |
+        up{job="tempo-compactor"} == 0
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Tempo Compactor 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+
+  - name: tempo-metrics-generator
+    interval: 30s
+    rules:
+    - alert: TempoMetricsGeneratorUnhealthy
+      expr: |
+        up{job="tempo-metrics-generator"} == 0
+      for: 5m
+      labels:
+        severity: warning
+        team: platform
+      annotations:
+        summary: "Tempo Metrics Generator 实例不健康"
+        description: "实例 {{ $labels.instance }} 已下线超过 5 分钟"
+
+  - name: tempo-unhealthy-ring
+    interval: 30s
+    rules:
+    - alert: TempoUnhealthyRingMembers
+      expr: |
+        sum(rate(tempo_ring_member_heartbeats_total{component=~"ingester|distributor|compactor|metrics-generator"}[5m])) by (component)
+        == 0
+      for: 10m
+      labels:
+        severity: critical
+        team: platform
+      annotations:
+        summary: "Tempo {{ $labels.component }} 心跳中断"
+        description: "组件 {{ $labels.component }} 5分钟内未发送心跳"

@@ -1,0 +1,168 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-distributor
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: distributor
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-distributor
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-ingester
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: ingester
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-ingester
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-querier
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: querier
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: querier
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-querier
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-query-frontend
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: query-frontend
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-query-frontend
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-compactor
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: compactor
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: compactor
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-compactor
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tempo-metrics-generator
+  namespace: monitoring
+  labels:
+    release: kps
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: metrics-generator
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  namespaceSelector:
+    matchNames: [monitoring]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: metrics-generator
+      app.kubernetes.io/part-of: tempo-stack
+  endpoints:
+    - port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      relabelings:
+        - targetLabel: job
+          replacement: tempo-metrics-generator

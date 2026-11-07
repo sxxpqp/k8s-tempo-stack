@@ -1,0 +1,123 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo-ingester
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  replicas: 2
+  serviceName: tempo-ingester-headless
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tempo
+      app.kubernetes.io/component: ingester
+      app.kubernetes.io/part-of: tempo-stack
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tempo
+        app.kubernetes.io/component: ingester
+        app.kubernetes.io/part-of: tempo-stack
+    spec:
+      serviceAccountName: tempo
+      terminationGracePeriodSeconds: 300
+      securityContext:
+        fsGroup: 10001
+        runAsUser: 10001
+        runAsGroup: 10001
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/component: ingester
+                    app.kubernetes.io/part-of: tempo-stack
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: tempo
+          image: grafana/tempo:2.7.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - -config.file=/etc/tempo/tempo.yaml
+            - -config.per-user-override-config=/etc/tempo-runtime/runtime-config.yaml
+            - -target=ingester
+          ports:
+            - name: grpc
+              containerPort: 9095
+              protocol: TCP
+            - name: metrics
+              containerPort: 3200
+              protocol: TCP
+            - name: memberlist
+              containerPort: 7946
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: 3200
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3200
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 3200
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tempo
+              readOnly: true
+            - name: runtime-config
+              mountPath: /etc/tempo-runtime
+              readOnly: true
+            - name: data
+              mountPath: /var/tempo
+      volumes:
+        - name: config
+          configMap:
+            name: tempo-config
+            defaultMode: 0400
+        - name: runtime-config
+          configMap:
+            name: tempo-runtime-config
+            defaultMode: 0400
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: tempo
+          app.kubernetes.io/part-of: tempo-stack
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 100Gi

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-service
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: java-service
+    app.kubernetes.io/part-of: demo-stack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: java-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: java-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: java-service
+          image: registry.cn-hangzhou.aliyuncs.com/sxxpqp/java-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://tempo-distributor.monitoring:4317"
+            - name: PYTHON_SERVICE_URL
+              value: "http://python-service.demo:8080"
+          envFrom:
+            - configMapRef:
+                name: demo-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /api/hello
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/hello
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-service
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: java-service
+    app.kubernetes.io/part-of: demo-stack
+spec:
+  selector:
+    app.kubernetes.io/name: java-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      targetPort: 9090

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+  namespace: demo
+  labels:
+    app.kubernetes.io/part-of: demo-stack
+data:
+  LOG_LEVEL: "info"

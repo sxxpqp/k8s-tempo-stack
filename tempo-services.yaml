@@ -1,0 +1,299 @@
+---
+# ── memberlist 集群内部发现 ─────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-memberlist
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: memberlist
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: http
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Distributor (Span 接收入口) ────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-distributor-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+    - name: jaeg-thrift
+      port: 14268
+      targetPort: 14268
+      protocol: TCP
+    - name: jaeg-compact
+      port: 6831
+      targetPort: 6831
+      protocol: UDP
+    - name: jaeg-binary
+      port: 6832
+      targetPort: 6832
+      protocol: UDP
+    - name: jaeger-grpc
+      port: 14250
+      targetPort: 14250
+      protocol: TCP
+    - name: zipkin
+      port: 9411
+      targetPort: 9411
+      protocol: TCP
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: memberlist
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Distributor 集群 Service (应用推送 Span 入口) ──────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-distributor
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+      protocol: TCP
+    - name: jaeg-thrift
+      port: 14268
+      targetPort: 14268
+      protocol: TCP
+    - name: jaeg-compact
+      port: 6831
+      targetPort: 6831
+      protocol: UDP
+    - name: jaeg-binary
+      port: 6832
+      targetPort: 6832
+      protocol: UDP
+    - name: jaeger-grpc
+      port: 14250
+      targetPort: 14250
+      protocol: TCP
+    - name: zipkin
+      port: 9411
+      targetPort: 9411
+      protocol: TCP
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: distributor
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Ingester Headless ──────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-ingester-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+      protocol: TCP
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: memberlist
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: ingester
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Querier Headless ──────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-querier-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: querier
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+      protocol: TCP
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: memberlist
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: querier
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Query Frontend Headless ───────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-query-frontend-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Query Frontend (Grafana / 外部查询入口) ────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-query-frontend
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: grpc
+      port: 9095
+      targetPort: 9095
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: query-frontend
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Compactor Headless ────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-compactor-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: compactor
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: memberlist
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: compactor
+    app.kubernetes.io/part-of: tempo-stack
+---
+# ── Metrics Generator Headless ────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo-metrics-generator-headless
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: metrics-generator
+    app.kubernetes.io/part-of: tempo-stack
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: metrics
+      port: 3200
+      targetPort: 3200
+      protocol: TCP
+    - name: memberlist
+      port: 7946
+      targetPort: 7946
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/component: metrics-generator
+    app.kubernetes.io/part-of: tempo-stack

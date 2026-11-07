@@ -1,0 +1,170 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: tempo
+    app.kubernetes.io/part-of: tempo-stack
+data:
+  tempo.yaml: |
+    # ── 认证 ───────────────────────────────────────────────
+    # 内网部署无需认证, 通过 NetworkPolicy 控制访问
+    # 若需要多租户, 开启 multitenancy_enabled 并在 distributor 侧注入 X-Scope-OrgID
+    multitenancy_enabled: false
+
+    # ── 服务器配置 ─────────────────────────────────────────
+    server:
+      http_listen_port: 3200
+      grpc_listen_port: 9095
+      http_server_read_timeout: 600s
+      http_server_write_timeout: 600s
+      grpc_server_max_recv_msg_size: 104857600
+      grpc_server_max_send_msg_size: 104857600
+
+    # ── 成员发现 (memberlist) ─────────────────────────────
+    memberlist:
+      join_members:
+        - tempo-memberlist
+      abort_if_cluster_join_fails: false
+
+    # ── Distributor ───────────────────────────────────────
+    # 接收来自 OTLP / Jaeger / Zipkin / OpenCensus 的 spans
+    # 分发到 ingester
+    distributor:
+      receivers:
+        jaeger:
+          protocols:
+            thrift_http:
+            thrift_compact:
+            thrift_binary:
+            grpc:
+              endpoint: 0.0.0.0:14250
+        otlp:
+          protocols:
+            http:
+              endpoint: 0.0.0.0:4318
+            grpc:
+              endpoint: 0.0.0.0:4317
+        zipkin:
+        opencensus:
+      ring:
+        kvstore:
+          store: memberlist
+
+    # ── Ingester ──────────────────────────────────────────
+    # 将 spans 批量写入块存储, WAL 保证数据不丢失
+    ingester:
+      lifecycler:
+        ring:
+          kvstore:
+            store: memberlist
+          replication_factor: 1
+        num_tokens: 512
+        join_after: 10s
+      max_block_duration: 30m
+      complete_block_timeout: 15m
+      override_ring_key: ring
+
+    # ── Metrics Generator ─────────────────────────────────
+    # 从 traces 中自动生成 RED 指标 (Rate/Error/Duration)
+    metrics_generator:
+      ring:
+        kvstore:
+          store: memberlist
+      processor:
+        service_graphs:
+          max_items: 10000
+          wait: 10s
+          workers: 10
+          dimensions: [cluster, namespace]
+        span_metrics:
+          dimensions: [service.name, service.namespace, cluster, status.code]
+          histogram_buckets: [0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.0, 2.0, 4.0, 8.0, 16.0]
+      storage:
+        path: /var/tempo/generator
+        remote_write:
+          - url: http://kps-kube-prometheus-stack-prometheus.monitoring:9090/api/v1/write
+            send_exemplars: true
+            send_native_histograms: true
+            headers:
+              prometheus_tenant: tempo
+
+    # ── Compactor ─────────────────────────────────────────
+    compactor:
+      ring:
+        kvstore:
+          store: memberlist
+      compaction:
+        block_retention: 336h            # 保留 14 天
+        compacted_block_retention: 1h
+        compaction_window: 1h
+        compaction_cycle: 30m
+        max_compaction_objects: 6000000
+        max_block_bytes: 107374182400    # 100 GiB
+        v2_in_buffer_bytes: 5242880      # 5 MiB
+        v2_out_buffer_bytes: 20971520    # 20 MiB
+        v2_prefetch_traces_count: 1000
+
+    # ── Querier ───────────────────────────────────────────
+    querier:
+      frontend_worker:
+        frontend_address: tempo-query-frontend-headless.monitoring.svc.cluster.local:9095
+        grpc_client_config:
+          max_recv_msg_size: 104857600
+          max_send_msg_size: 104857600
+      max_concurrent_queries: 20
+      search:
+        query_timeout: 30s
+      trace_by_id:
+        query_timeout: 10s
+
+    # ── Query Frontend ────────────────────────────────────
+    # 查询入口, 负责查询拆分和缓存
+    query_frontend:
+      max_outstanding_per_tenant: 2000
+      search:
+        concurrent_jobs: 1000
+        target_bytes_per_job: 104857600
+        default_result_limit: 20
+        max_duration: 168h
+        query_backend_after: 15m
+        query_ingesters_until: 30m
+      trace_by_id:
+        query_shards: 50
+
+    # ── 存储配置 ──────────────────────────────────────────
+    storage:
+      trace:
+        backend: s3
+        s3:
+          endpoint: minio.minio.svc.cluster.local:9000
+          bucket: tempo-traces
+          access_key: minioadmin
+          secret_key: minioadmin
+          insecure: true
+        wal:
+          path: /var/tempo/wal
+        block:
+          bloom_filter_false_positive: 0.01
+          version: vParquet4
+
+    # ── 覆盖配置 ──────────────────────────────────────────
+    overrides:
+      defaults:
+        metrics_generator:
+          processors: [service-graphs, span-metrics]
+          generate_native_histograms: both
+      per_tenant_override_config: /etc/tempo-runtime/runtime-config.yaml
+      user_configurable_overrides:
+        enabled: false
+
+    # ── Usage 报告 ────────────────────────────────────────
+    usage_report:
+      reporting_enabled: false
+
+    # ── Internal Server (health/metrics) ─────────────────
+    internal_server:
+      enable: true
+      http_listen_port: 3201

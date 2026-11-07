@@ -1,0 +1,280 @@
+{
+  "title": "Demo Services - Logs / Metrics / Traces",
+  "uid": "demo-observability",
+  "tags": ["tempo", "loki", "prometheus", "demo"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-15m", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "custom",
+        "current": { "text": "go-service", "value": "go-service" },
+        "options": [
+          { "text": "go-service", "value": "go-service" },
+          { "text": "java-service", "value": "java-service" },
+          { "text": "python-service", "value": "python-service" }
+        ]
+      },
+      {
+        "name": "datasource_prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "prometheus" }
+      },
+      {
+        "name": "datasource_loki",
+        "type": "datasource",
+        "query": "loki",
+        "current": { "text": "Loki", "value": "loki" }
+      },
+      {
+        "name": "datasource_tempo",
+        "type": "datasource",
+        "query": "tempo",
+        "current": { "text": "Tempo", "value": "tempo" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "📋 Logs - 按服务筛选",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "Service Logs ($service)",
+      "datasource": { "type": "loki", "uid": "${datasource_loki}" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "expr": "{app=\"${service}\"}",
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "${datasource_loki}" }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "row",
+      "title": "📊 Metrics - RED 指标 (Rate / Error / Duration)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "Request Rate (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"${service}\"}[5m]))",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 }
+      }
+    },
+    {
+      "id": 21,
+      "type": "stat",
+      "title": "P99 Latency",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 14 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(traces_spanmetrics_latency_bucket{service=\"${service}\"}[5m])) by (le))",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 4 }
+      }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Error Rate (/s)",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 14 },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"${service}\", status_code=\"ERROR\"}[5m]))",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Request Rate over Time",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_calls_total{service=\"${service}\"}[1m]))",
+          "legendFormat": "calls/s",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Latency over Time (P50/P90/P99)",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(traces_spanmetrics_latency_bucket{service=\"${service}\"}[1m])) by (le))",
+          "legendFormat": "P50",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(traces_spanmetrics_latency_bucket{service=\"${service}\"}[1m])) by (le))",
+          "legendFormat": "P90",
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(traces_spanmetrics_latency_bucket{service=\"${service}\"}[1m])) by (le))",
+          "legendFormat": "P99",
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": { "lineWidth": 2, "fillOpacity": 15, "spanNulls": true }
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Latency Buckets (Exemplar ⭐ → Trace)",
+      "description": "Zoom in to see ⭐ exemplar dots linking to Tempo traces. Turn on Exemplars in panel options (right panel menu).",
+      "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 26 },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "lineWidth": 1, "fillOpacity": 10, "spanNulls": true }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(traces_spanmetrics_latency_bucket{service=\"${service}\"}[1m])) by (le)",
+          "legendFormat": "le={{le}}",
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "${datasource_prometheus}" }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "row",
+      "title": "🔍 Traces - 链路追踪",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }
+    },
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Recent Traces",
+      "datasource": { "type": "tempo", "uid": "${datasource_tempo}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
+      "targets": [
+        {
+          "query": "{resource.service.name=\"${service}\"}",
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "${datasource_tempo}" },
+          "queryType": "search",
+          "limit": 20,
+          "tableType": "traces"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "row",
+      "title": "🗺️ Service Graph",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 }
+    },
+    {
+      "id": 40,
+      "type": "nodeGraph",
+      "title": "Service Dependency Graph",
+      "datasource": { "type": "tempo", "uid": "${datasource_tempo}" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 43 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "${datasource_tempo}" },
+          "queryType": "serviceMap",
+          "serviceMapQuery": ""
+        }
+      ]
+    }
+  ]
+}
