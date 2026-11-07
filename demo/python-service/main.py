@@ -18,7 +18,13 @@ from flask import Flask, request
 import requests
 
 from opentelemetry import trace, metrics, propagate
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import TracerProvider, Status, StatusCode
+# 生产: 出站调用异常处理示例:
+# try:
+#     resp = requests.get(...)
+# except Exception as e:
+#     span.set_status(StatusCode.ERROR, str(e))
+#     span.record_exception(e)
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_NAMESPACE
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -49,7 +55,7 @@ resource = Resource.create({
 trace_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
 tracer_provider = TracerProvider(
     resource=resource,
-    sampler=ALWAYS_ON,
+    sampler=ALWAYS_ON,  # 生产: ParentBased(0.1) — 10% 采样
     active_span_processor=BatchSpanProcessor(trace_exporter),
 )
 trace.set_tracer_provider(tracer_provider)
@@ -99,6 +105,9 @@ def hello():
         "user.role": "anonymous",
     })
 
+    # 生产: 正常结束设 StatusCode.OK，异常设 StatusCode.ERROR
+    # span.set_status(StatusCode.OK)
+
     # 模拟业务
     time.sleep(random.uniform(0.02, 0.08))
 
@@ -122,7 +131,7 @@ def chain():
         "business.priority": 2,
     })
 
-    # 模拟处理
+    # 模拟处理 (叶子节点, 无下游调用)
     time.sleep(random.uniform(0.01, 0.04))
     span.add_event("python-final", {"step": "python-format"})
 

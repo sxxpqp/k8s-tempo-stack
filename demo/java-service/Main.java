@@ -4,6 +4,8 @@ import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.context.Scope;
@@ -84,6 +86,7 @@ public class Main {
             .setResource(resource)
             .addSpanProcessor(BatchSpanProcessor.builder(traceExporter).build())
             .setSampler(Sampler.alwaysOn())
+            // 生产: Sampler.parentBased(Sampler.traceIdRatioBased(0.1))  — 10% 采样
             .build();
 
         // ── MeterProvider (Prometheus) ──────────────────
@@ -125,6 +128,7 @@ public class Main {
 
             Span span = tracer.spanBuilder("GET /api/hello")
                 .setParent(parentCtx)
+                .setSpanKind(SpanKind.SERVER)
                 .startSpan();
             try (Scope scope = span.makeCurrent()) {
                 SpanContext sc = span.getSpanContext();
@@ -166,6 +170,7 @@ public class Main {
                 } catch (Exception e) {
                     result += " → (Python unreachable: " + e.getMessage() + ")";
                     span.setAttribute("error", e.getMessage());
+                    span.setStatus(StatusCode.ERROR, e.getMessage());
                 }
 
                 logWithSpan(span, traceId, "java-service",
@@ -193,6 +198,7 @@ public class Main {
 
             Span span = tracer.spanBuilder("GET /api/chain")
                 .setParent(parentCtx)
+                .setSpanKind(SpanKind.SERVER)
                 .startSpan();
             try (Scope scope = span.makeCurrent()) {
                 SpanContext sc = span.getSpanContext();
@@ -232,6 +238,7 @@ public class Main {
                 } catch (Exception e) {
                     chain += "(error: " + e.getMessage() + ")";
                     span.setAttribute("error", e.getMessage());
+                    span.setStatus(StatusCode.ERROR, e.getMessage());
                 }
 
                 logWithSpan(span, traceId, "java-service",

@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/metric"
@@ -58,6 +59,7 @@ func main() {
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(res),
+		// 生产: sdktrace.ParentBased(0.1) — 10% 采样
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 	otel.SetTracerProvider(tp)
@@ -147,6 +149,7 @@ func goHelloHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		result += " → (Java unreachable: " + err.Error() + ")"
 		span.SetAttributes(attribute.String("error", err.Error()))
+		span.SetStatus(codes.Error, err.Error())
 	}
 
 	logWithTrace(&ctx, "go-service", fmt.Sprintf("trace_id=%s span_id=%s handled request, result: %s",
@@ -193,6 +196,7 @@ func chainHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		chain += fmt.Sprintf("(error: %v)", err)
 		span.SetAttributes(attribute.String("error", err.Error()))
+		span.SetStatus(codes.Error, err.Error())
 	}
 
 	logWithTrace(&ctx, "go-service",
